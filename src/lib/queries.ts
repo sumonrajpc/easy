@@ -357,3 +357,242 @@ export async function getPlatformStats() {
 
   return { studentTotal, courseTotal, instructorTotal };
 }
+
+// ------------------------------- ADMIN -------------------------------
+export async function getAdminOverview() {
+  const { payments } = await import("@/db/schema");
+  const [
+    [{ total: studentTotal }],
+    [{ total: instructorTotal }],
+    [{ total: courseTotal }],
+    [{ total: publishedTotal }],
+    [{ total: enrollmentTotal }],
+    [{ total: pendingPayments }],
+    [{ sum: approvedRevenue }],
+  ] = await Promise.all([
+    db.select({ total: count(users.id) }).from(users).where(eq(users.role, "STUDENT")),
+    db.select({ total: count(users.id) }).from(users).where(eq(users.role, "INSTRUCTOR")),
+    db.select({ total: count(courses.id) }).from(courses),
+    db.select({ total: count(courses.id) }).from(courses).where(eq(courses.isPublished, true)),
+    db.select({ total: count(enrollments.id) }).from(enrollments),
+    db.select({ total: count(payments.id) }).from(payments).where(eq(payments.status, "PENDING")),
+    db
+      .select({ sum: sql<string>`coalesce(sum(${payments.amount}), 0)` })
+      .from(payments)
+      .where(eq(payments.status, "APPROVED")),
+  ]);
+
+  return {
+    studentTotal,
+    instructorTotal,
+    courseTotal,
+    publishedTotal,
+    enrollmentTotal,
+    pendingPayments,
+    approvedRevenue: Number(approvedRevenue ?? 0),
+  };
+}
+
+export async function getRecentEnrollments(limit = 6) {
+  const rows = await db
+    .select({
+      id: enrollments.id,
+      enrolledAt: enrollments.enrolledAt,
+      studentName: users.name,
+      courseTitle: courses.title,
+    })
+    .from(enrollments)
+    .leftJoin(users, eq(users.id, enrollments.userId))
+    .leftJoin(courses, eq(courses.id, enrollments.courseId))
+    .orderBy(desc(enrollments.enrolledAt))
+    .limit(limit);
+  return rows;
+}
+
+export async function getAllUsersByRole(role: "STUDENT" | "INSTRUCTOR" | "ADMIN") {
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      phone: users.phone,
+      isActive: users.isActive,
+      createdAt: users.createdAt,
+      lastActiveAt: users.lastActiveAt,
+    })
+    .from(users)
+    .where(eq(users.role, role))
+    .orderBy(desc(users.createdAt));
+  return rows;
+}
+
+export async function getAllCoursesForAdmin() {
+  const rows = await db
+    .select({
+      id: courses.id,
+      title: courses.title,
+      slug: courses.slug,
+      price: courses.price,
+      category: courses.category,
+      isPublished: courses.isPublished,
+      createdAt: courses.createdAt,
+      instructorName: users.name,
+      studentCount: count(enrollments.id),
+    })
+    .from(courses)
+    .leftJoin(users, eq(users.id, courses.instructorId))
+    .leftJoin(enrollments, eq(enrollments.courseId, courses.id))
+    .groupBy(courses.id, users.name)
+    .orderBy(desc(courses.createdAt));
+  return rows;
+}
+
+export async function getAllPayments() {
+  const { payments } = await import("@/db/schema");
+  const rows = await db
+    .select({
+      id: payments.id,
+      amount: payments.amount,
+      method: payments.method,
+      senderNumber: payments.senderNumber,
+      trxId: payments.trxId,
+      status: payments.status,
+      createdAt: payments.createdAt,
+      studentName: users.name,
+      studentEmail: users.email,
+      courseTitle: courses.title,
+    })
+    .from(payments)
+    .leftJoin(users, eq(users.id, payments.userId))
+    .leftJoin(courses, eq(courses.id, payments.courseId))
+    .orderBy(desc(payments.createdAt));
+  return rows;
+}
+
+// ------------------------------- INSTRUCTOR -------------------------------
+export async function getInstructorOverview(instructorId: number) {
+  const instructorCourses = await db
+    .select({ id: courses.id })
+    .from(courses)
+    .where(eq(courses.instructorId, instructorId));
+  const courseIds = instructorCourses.map((c) => c.id);
+
+  let studentTotal = 0;
+  let enrollmentTotal = 0;
+  let avgRating = 0;
+  if (courseIds.length > 0) {
+    const [{ total: enrollTotal }] = await db
+      .select({ total: count(enrollments.id) })
+      .from(enrollments)
+      .where(sql`${enrollments.courseId} in ${courseIds}`);
+    enrollmentTotal = enrollTotal;
+
+    const distinctStudents = await db
+      .select({ userId: enrollments.userId })
+      .from(enrollments)
+      .where(sql`${enrollments.courseId} in ${courseIds}`)
+      .groupBy(enrollments.userId);
+    studentTotal = distinctStudents.length;
+
+    const [{ rating }] = await db
+      .select({ rating: avg(reviews.rating) })
+      .from(reviews)
+      .where(sql`${reviews.courseId} in ${courseIds}`);
+    avgRating = rating ? Number(rating) : 0;
+  }
+
+  return {
+    courseTotal: courseIds.length,
+    studentTotal,
+    enrollmentTotal,
+    avgRating,
+  };
+}
+
+export async function getInstructorCourseDetail(instructorId: number, courseId: number) {
+  const { assignments, submissions } = await import("@/db/schema");
+
+  const [course] = await db
+    .select()
+    .from(courses)
+    .where(eq(courses.id, courseId))
+    .limit(1);
+  if (!course) return null;
+  if (course.instructorId !== instructorId) return null;
+
+  const courseModules = await db
+    .select()
+    .from(modules)
+    .where(eq(modules.courseId, course.id))
+    .orderBy(modules.order);
+  const moduleIds = courseModules.map((m) => m.id);
+  const allLessons = moduleIds.length
+    ? await db.select().from(lessons).where(sql`${lessons.moduleId} in ${moduleIds}`).orderBy(lessons.order)
+    : [];
+
+  const [{ total: studentCount }] = await db
+    .select({ total: count(enrollments.id) })
+    .from(enrollments)
+    .where(eq(enrollments.courseId, course.id));
+
+  const courseAssignments = await db
+    .select()
+    .from(assignments)
+    .where(eq(assignments.courseId, course.id))
+    .orderBy(desc(assignments.createdAt));
+
+  const assignmentIds = courseAssignments.map((a) => a.id);
+  const allSubmissions = assignmentIds.length
+    ? await db
+        .select({
+          id: submissions.id,
+          assignmentId: submissions.assignmentId,
+          note: submissions.note,
+          fileUrl: submissions.fileUrl,
+          grade: submissions.grade,
+          feedback: submissions.feedback,
+          submittedAt: submissions.submittedAt,
+          studentName: users.name,
+        })
+        .from(submissions)
+        .leftJoin(users, eq(users.id, submissions.studentId))
+        .where(sql`${submissions.assignmentId} in ${assignmentIds}`)
+        .orderBy(desc(submissions.submittedAt))
+    : [];
+
+  return {
+    course,
+    studentCount,
+    modules: courseModules.map((m) => ({
+      ...m,
+      lessons: allLessons.filter((l) => l.moduleId === m.id),
+    })),
+    assignments: courseAssignments.map((a) => ({
+      ...a,
+      submissions: allSubmissions.filter((s) => s.assignmentId === a.id),
+    })),
+  };
+}
+
+export async function getInstructorCourses(instructorId: number) {
+  const rows = await db
+    .select({
+      id: courses.id,
+      title: courses.title,
+      slug: courses.slug,
+      price: courses.price,
+      category: courses.category,
+      thumbnail: courses.thumbnail,
+      isPublished: courses.isPublished,
+      createdAt: courses.createdAt,
+      studentCount: count(enrollments.id),
+      avgRating: avg(reviews.rating),
+    })
+    .from(courses)
+    .leftJoin(enrollments, eq(enrollments.courseId, courses.id))
+    .leftJoin(reviews, eq(reviews.courseId, courses.id))
+    .where(eq(courses.instructorId, instructorId))
+    .groupBy(courses.id)
+    .orderBy(desc(courses.createdAt));
+  return rows;
+}
