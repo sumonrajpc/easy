@@ -68,9 +68,45 @@ export async function toggleCoursePublishAction(formData: FormData) {
   await requireAdmin();
   const courseId = Number(formData.get("courseId"));
   const isPublished = formData.get("isPublished") === "true";
+  if (!Number.isInteger(courseId) || courseId < 1) throw new Error("Invalid course");
   await db.update(courses).set({ isPublished }).where(eq(courses.id, courseId));
   revalidatePath("/admin/courses");
   revalidatePath("/courses");
+}
+
+export async function updateCourseAction(formData: FormData) {
+  await requireAdmin();
+  const courseId = Number(formData.get("courseId"));
+  const title = String(formData.get("title") ?? "").trim();
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const price = String(formData.get("price") ?? "0").trim();
+  const promoVideoUrl = String(formData.get("promoVideoUrl") ?? "").trim();
+  if (!Number.isInteger(courseId) || courseId < 1 || !title || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    throw new Error("Invalid course details");
+  }
+  if (!/^\d+(?:\.\d{1,2})?$/.test(price)) throw new Error("Invalid price");
+  if (promoVideoUrl && !/^https?:\/\//i.test(promoVideoUrl)) throw new Error("Video URL must start with http:// or https://");
+  await db.update(courses).set({ title, slug, price, promoVideoUrl: promoVideoUrl || null }).where(eq(courses.id, courseId));
+  revalidatePath("/admin/courses");
+  revalidatePath(`/courses/${slug}`);
+}
+
+export async function deleteCourseAction(formData: FormData) {
+  await requireAdmin();
+  const courseId = Number(formData.get("courseId"));
+  if (!Number.isInteger(courseId) || courseId < 1) throw new Error("Invalid course");
+  await db.delete(courses).where(eq(courses.id, courseId));
+  revalidatePath("/admin/courses");
+  revalidatePath("/courses");
+}
+
+export async function updateMarqueeAction(formData: FormData) {
+  await requireAdmin();
+  const marqueeText = String(formData.get("marqueeText") ?? "").trim();
+  if (!marqueeText || marqueeText.length > 240) throw new Error("Invalid marquee text");
+  await db.insert(siteSettings).values({ key: "marqueeText", value: marqueeText }).onConflictDoUpdate({ target: siteSettings.key, set: { value: marqueeText } });
+  revalidatePath("/");
+  revalidatePath("/admin/site");
 }
 
 export async function updateSiteSettingsAction(

@@ -3,12 +3,43 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogOut, Home } from "lucide-react";
+import {
+  Menu,
+  X,
+  LogOut,
+  Home,
+  LayoutDashboard,
+  BookOpen,
+  ClipboardList,
+  Award,
+  Users,
+  GraduationCap,
+  BarChart3,
+  Settings,
+  FileText,
+  PlusCircle,
+} from "lucide-react";
 import Logo from "./Logo";
 import { logoutAction } from "@/app/actions/auth";
 import type { LucideIcon } from "lucide-react";
 
-export type NavItem = { label: string; href: string; icon: LucideIcon };
+const iconMap = {
+  LayoutDashboard,
+  BookOpen,
+  ClipboardList,
+  Award,
+  Users,
+  GraduationCap,
+  BarChart3,
+  Settings,
+  FileText,
+  PlusCircle,
+  Home,
+} satisfies Record<string, LucideIcon>;
+
+export type NavIconName = keyof typeof iconMap;
+
+export type NavItem = { label: string; href: string; icon: NavIconName };
 
 export default function PortalShell({
   navItems,
@@ -46,7 +77,7 @@ export default function PortalShell({
         <nav className="flex flex-col gap-1 p-3">
           {navItems.map((item) => {
             const active = pathname === item.href || (item.href !== "/dashboard" && item.href !== "/instructor" && item.href !== "/admin" && pathname.startsWith(item.href));
-            const Icon = item.icon;
+            const Icon = iconMap[item.icon];
             return (
               <Link
                 key={item.href}
