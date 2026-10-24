@@ -1,5 +1,6 @@
 import { getAllCoursesForAdmin } from "@/lib/queries";
 import { deleteCourseAction, toggleCoursePublishAction, updateCourseAction } from "@/app/actions/admin";
+import { VideoUploadForm } from "@/components/admin/VideoUploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function AdminCoursesPage() {
                 <form action={deleteCourseAction}><input type="hidden" name="courseId" value={course.id} /><button type="submit" className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700">Delete</button></form>
               </div>
             </div>
-            <p className="mt-3 text-xs text-slate-400">Video upload storage is not connected, so use a hosted MP4/YouTube/Vimeo URL for now.</p>
+            <VideoUploadForm courseId={course.id} currentUrl={course.promoVideoUrl} />
           </article>
         ))}
       </div>

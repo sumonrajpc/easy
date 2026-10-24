@@ -448,6 +448,7 @@ export async function getAllCoursesForAdmin() {
       title: courses.title,
       slug: courses.slug,
       price: courses.price,
+      promoVideoUrl: courses.promoVideoUrl,
       category: courses.category,
       isPublished: courses.isPublished,
       createdAt: courses.createdAt,
