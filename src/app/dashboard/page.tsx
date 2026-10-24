@@ -28,7 +28,7 @@ export default async function DashboardPage() {
   const firstName = user.name.split(" ")[0];
 
   return (
-    <div className="mx-auto w-full max-w-7xl animate-fade-in">
+    <div className="mx-auto w-full max-w-7xl animate-fade-in font-[family-name:var(--font-hind-siliguri)]">
       <section className="relative overflow-hidden rounded-[2rem] bg-slate-950 px-6 py-8 text-white shadow-xl sm:px-10 sm:py-10">
         <div className="absolute -right-20 -top-28 size-80 rounded-full bg-brand-500/30 blur-3xl" />
         <div className="absolute -bottom-32 left-1/3 size-72 rounded-full bg-orange-500/20 blur-3xl" />
