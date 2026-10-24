@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Users, BookOpen, ClipboardList } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { getInstructorCourseDetail } from "@/lib/queries";
+import LessonManager from "@/components/instructor/LessonManager";
 
 export const dynamic = "force-dynamic";
 
@@ -78,22 +79,7 @@ export default async function InstructorCourseDetailPage({
           modules.map((m) => (
             <div key={m.id} className="rounded-2xl border border-slate-100 bg-white p-5">
               <p className="font-bold text-slate-900">{m.title}</p>
-              <ul className="mt-2 space-y-1">
-                {m.lessons.map((l) => (
-                  <li key={l.id} className="flex items-center gap-2 text-sm text-slate-600">
-                    <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-                    {l.title}
-                    {l.isFreePreview && (
-                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
-                        Free
-                      </span>
-                    )}
-                  </li>
-                ))}
-                {m.lessons.length === 0 && (
-                  <li className="text-sm text-slate-400">No lessons in this module.</li>
-                )}
-              </ul>
+<LessonManager courseId={course.id} moduleId={m.id} lessons={m.lessons} />
             </div>
           ))
         )}
