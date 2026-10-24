@@ -13,6 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { label: "Courses", href: "/admin/courses", icon: "BookOpen" },
     { label: "Students", href: "/admin/users", icon: "Users" },
     { label: "Payments", href: "/admin/payments", icon: "FileText" },
+    { label: "Site Controls", href: "/admin/site", icon: "Settings" },
   ];
 
   return (

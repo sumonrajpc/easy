@@ -7,6 +7,7 @@ import {
   modules,
   lessons,
   progress,
+  siteSettings,
 } from "@/db/schema";
 import { and, avg, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type { CourseCardData } from "@/components/CourseCard";
@@ -424,6 +425,20 @@ export async function getAllUsersByRole(role: "STUDENT" | "INSTRUCTOR" | "ADMIN"
     .where(eq(users.role, role))
     .orderBy(desc(users.createdAt));
   return rows;
+}
+
+export async function getAdminSiteControls() {
+  const [settings, activeUsers] = await Promise.all([
+    db.select().from(siteSettings),
+    db.select({ id: users.id, name: users.name, role: users.role, lastActiveAt: users.lastActiveAt })
+      .from(users)
+      .where(sql`${users.lastActiveAt} > now() - interval '5 minutes'`)
+      .orderBy(desc(users.lastActiveAt)),
+  ]);
+  return {
+    settings: Object.fromEntries(settings.map((setting) => [setting.key, setting.value ?? ""])),
+    activeUsers,
+  };
 }
 
 export async function getAllCoursesForAdmin() {
